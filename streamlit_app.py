@@ -6,21 +6,30 @@ import joblib, os, json
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve
 import shap
 
-st.set_page_config(page_title="Parkinson’s ML App v28+", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="Parkinson’s ML App", page_icon="🧠", layout="wide")
 
 # Paths
 DATA_PATH = "data/parkinsons.csv"
 MODELS_DIR = "models"
 ASSETS_DIR = "assets"
 
-# Ensure pipeline artifacts exist, else rerun pipeline
 leaderboard_path = os.path.join(ASSETS_DIR,"leaderboard.json")
 metrics_path = os.path.join(ASSETS_DIR,"metrics.json")
 model_path = os.path.join(MODELS_DIR,"best_model.joblib")
 
-if not (os.path.exists(leaderboard_path) and os.path.exists(metrics_path) and os.path.exists(model_path)):
-    st.warning("⚠️ לא נמצאו מודלים או מדדים – מריץ pipeline מחדש...")
-    os.system("python model_pipeline.py")
+# =========================
+# Auto-fix: run pipeline if files missing
+# =========================
+def ensure_pipeline_artifacts():
+    if not (os.path.exists(leaderboard_path) and os.path.exists(metrics_path) and os.path.exists(model_path)):
+        st.warning("⚠️ לא נמצאו מודלים או מדדים – מריץ pipeline מחדש...")
+        exit_code = os.system("python model_pipeline.py")
+        if exit_code != 0:
+            st.error("❌ שגיאה בהרצת model_pipeline.py – בדוק את הקובץ.")
+        else:
+            st.success("✅ pipeline רץ בהצלחה ונוצרו הקבצים הנדרשים.")
+
+ensure_pipeline_artifacts()
 
 # Load dataset
 df = pd.read_csv(DATA_PATH)
@@ -97,7 +106,7 @@ with tab1:
 with tab2:
     st.header("🤖 Model Performance & Zoo")
 
-    # KPIs Dashboard for best model
+    # KPIs Dashboard
     st.subheader("📌 KPIs (Best Model - Test Set)")
     cols = st.columns(5)
     cols[0].metric("Accuracy", f"{metrics['test']['accuracy']:.2f}")
@@ -118,20 +127,21 @@ with tab2:
     leaderboard_df = pd.DataFrame(leaderboard_df).sort_values(by="ROC-AUC (Test)", ascending=False)
     st.dataframe(leaderboard_df)
 
-    # Select any model from zoo
+    # Select model
     choice = st.selectbox("Select a model to visualize:", leaderboard_df["Model"])
     model = best_model
-    # try to load chosen model if available in models/ folder
     chosen_model_path = os.path.join(MODELS_DIR, f"{choice}_model.joblib")
     if os.path.exists(chosen_model_path):
         model = joblib.load(chosen_model_path)
 
+    # Confusion Matrix
     y_pred = model.predict(X)
     cm = confusion_matrix(y, y_pred)
     fig, ax = plt.subplots()
     ConfusionMatrixDisplay(cm, display_labels=["Healthy","Parkinson’s"]).plot(ax=ax)
     st.pyplot(fig)
 
+    # ROC Curve
     y_prob = safe_predict_proba(model, X)[:,1]
     fpr,tpr,_ = roc_curve(y, y_prob)
     fig, ax = plt.subplots()
@@ -177,7 +187,7 @@ with tab4:
     if file and st.button("Retrain"):
         new_df = pd.read_csv(file)
         new_df.to_csv("data/new_train.csv",index=False)
-        os.system("python model_pipeline.py")  # retrain pipeline
+        os.system("python model_pipeline.py")
         st.success("Retraining complete! Leaderboard and metrics updated.")
 
     # Training log
