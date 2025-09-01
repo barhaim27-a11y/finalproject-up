@@ -20,12 +20,25 @@ from sklearn.neural_network import MLPClassifier
 
 # Paths
 BASE_DIR = os.getcwd()
-DATA_PATH = os.path.join("data", "parkinsons.csv")
-MODELS_DIR = "models"
-ASSETS_DIR = "assets"
+DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_PATH = os.path.join(DATA_DIR, "parkinsons.csv")
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
+os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(ASSETS_DIR, exist_ok=True)
+
+# =========================
+# Auto-download dataset if missing
+# =========================
+if not os.path.exists(DATA_PATH):
+    print("⚠️ Dataset not found locally – downloading from UCI repository...")
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
+    df_raw = pd.read_csv(url)
+    # Save copy locally
+    df_raw.to_csv(DATA_PATH, index=False)
+    print(f"✅ Dataset downloaded and saved to {DATA_PATH}")
 
 # Load dataset
 df = pd.read_csv(DATA_PATH)
